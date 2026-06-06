@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shilingi Ledger - Informal Trader Accounting</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>💰 Shilingi Ledger</h1>
+            <p>Simple Accounting for Informal Traders</p>
+        </header>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-indicator" id="syncStatus"></div>
+                <span id="syncText">Online - Ready</span>
+            </div>
+            <div class="status-item">
+                <span id="transactionCount">0 Transactions</span>
+            </div>
+            <div class="status-item">
+                <span id="lastSync">Last sync: Just now</span>
+            </div>
+        </div>
+
+        <main>
+            <!-- Left Panel: Transaction Entry -->
+            <div class="card">
+                <h2>📝 Record Transaction</h2>
+                
+                <div class="form-group">
+                    <label for="transactionType">Transaction Type</label>
+                    <select id="transactionType">
+                        <option value="income">Income (Sale/Revenue)</option>
+                        <option value="expense">Expense (Cost/Purchase)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <input type="text" id="description" placeholder="e.g., Sold 2kg tomatoes" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="amount">Amount (KES)</label>
+                        <input type="number" id="amount" placeholder="0.00" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="category">Category</label>
+                        <select id="category">
+                            <option value="General">General</option>
+                            <option value="Produce">Produce</option>
+                            <option value="Stock">Stock</option>
+                            <option value="Transport">Transport</option>
+                            <option value="Marketing">Marketing</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="transactionDate">Date</label>
+                    <input type="date" id="transactionDate" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="notes">Notes (Optional)</label>
+                    <textarea id="notes" placeholder="Add any additional details..."></textarea>
+                </div>
+
+                <button type="button" class="btn-secondary" onclick="startVoiceEntry()">🎤 Voice Entry</button>
+                <button type="button" class="btn-secondary" onclick="startReceiptScan()">📷 Scan Receipt</button>
+                <input type="file" id="receiptInput" accept="image/*" style="display:none" onchange="handleReceiptUpload(event)">
+                <p id="voiceStatus" style="margin-top: 10px; color: #555; font-size: 0.95rem;">Speak phrases like “Sold 2kg tomatoes for 200 shillings”.</p>
+                <p id="receiptStatus" style="margin-top: 10px; color: #555; font-size: 0.95rem;">Upload receipt images to auto-extract amounts and vendor details.</p>
+
+                <button onclick="addTransaction()">Add Transaction</button>
+
+                <div class="tabs" style="margin-top: 25px; margin-bottom: 15px;">
+                    <button class="tab active" onclick="switchTab('all')">All Transactions</button>
+                    <button class="tab" onclick="switchTab('income')">Income</button>
+                    <button class="tab" onclick="switchTab('expense')">Expenses</button>
+                </div>
+
+                <div class="sync-notification" id="syncNotification">
+                    ✓ Data saved offline. Will sync when online.
+                </div>
+
+                <div id="allTab" class="tab-content active">
+                    <div class="transaction-list" id="transactionList">
+                        <div class="empty-state">
+                            <p>No transactions yet. Add your first transaction to get started!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="incomeTab" class="tab-content">
+                    <div class="transaction-list" id="incomeList">
+                        <div class="empty-state">
+                            <p>No income transactions yet.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="expenseTab" class="tab-content">
+                    <div class="transaction-list" id="expenseList">
+                        <div class="empty-state">
+                            <p>No expense transactions yet.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Dashboard & Analytics -->
+            <div class="card">
+                <h2>📊 Financial Dashboard</h2>
+
+                <div class="dashboard-grid">
+                    <div class="stat-box income">
+                        <h3>Total Income</h3>
+                        <div class="amount" id="totalIncome">KES 0.00</div>
+                    </div>
+                    <div class="stat-box expense">
+                        <h3>Total Expenses</h3>
+                        <div class="amount" id="totalExpense">KES 0.00</div>
+                    </div>
+                </div>
+
+                <div class="stat-box" style="margin-bottom: 15px;">
+                    <h3>Net Profit/Loss</h3>
+                    <div class="amount" id="netProfit">KES 0.00</div>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="profitChart"></canvas>
+                </div>
+
+                <div class="stat-box health" style="margin: 20px 0 10px; text-align: left;">
+                    <h3 style="margin-bottom: 8px;">Financial Health</h3>
+                    <div class="amount" id="healthStatusText">Stable</div>
+                    <p style="margin-top: 8px; font-size: 0.95rem; opacity: 0.9;">Daily profits and losses shown below help you spot trends fast.</p>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="healthChart"></canvas>
+                </div>
+
+                <div class="summary-stats">
+                    <div class="summary-stat">
+                        <div class="summary-stat-label">Profit Margin</div>
+                        <div class="summary-stat-value" id="profitMargin">0%</div>
+                    </div>
+                    <div class="summary-stat">
+                        <div class="summary-stat-label">Avg Daily Revenue</div>
+                        <div class="summary-stat-value" id="avgDailyRevenue">KES 0</div>
+                    </div>
+                    <div class="summary-stat">
+                        <div class="summary-stat-label">Transactions</div>
+                        <div class="summary-stat-value" id="totalTransactions">0</div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px; border-top: 1px solid #e9ecef; padding-top: 20px;">
+                    <h3 style="margin-bottom: 15px; color: #667eea;">Daily Breakdown</h3>
+                    <div class="chart-container">
+                        <canvas id="dailyChart"></canvas>
+                    </div>
+                </div>
+
+                <button class="btn-secondary" onclick="exportData()">📥 Export Data (JSON)</button>
+                <button class="btn-secondary" onclick="clearAllData()">🗑️ Clear All Data</button>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
